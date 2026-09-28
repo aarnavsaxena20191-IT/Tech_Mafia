@@ -36,9 +36,19 @@ The first participant is the team captain and is signed in after registration. E
 
 For a local MongoDB replica set, set `MONGODB_URI` in `.env`, then run `npm ci`, `npm run db:migrate`, `npm run db:seed`, and `npm start`. Transactions require a replica set; a standalone `mongod` is not sufficient. `npm run dev` enables Node's watch mode.
 
-## Isolated runner integration
+## Isolated code execution
 
-Set `EXECUTION_MODE=runner-api`, `RUNNER_URL`, and `RUNNER_TOKEN` only after deploying a hardened judge on a private network. The application calls `POST {RUNNER_URL}/v1/execute` with bearer authentication and JSON:
+The match editor's **Run public tests** and **Submit** actions compile and execute C or C++ in Judge0, not in the web server. Configure the Render web service with:
+
+| Key | Value |
+|---|---|
+| `EXECUTION_MODE` | `judge0` |
+| `JUDGE0_URL` | Your Judge0 API base URL, e.g. `https://ce.judge0.com` for a quick trial |
+| `CODE_TIMEOUT_MS` | `3000` (per-run ceiling; challenge settings can be lower) |
+
+The shared `https://ce.judge0.com` endpoint is useful for trying the integration, but it is a public shared service and does not provide a production service guarantee. For a live event, use an authenticated managed Judge0 endpoint or a self-hosted, current Judge0 release; add its API credential in Render as `JUDGE0_API_KEY` (Judge0 auth) or `JUDGE0_RAPIDAPI_KEY` (RapidAPI). Never commit credentials or put them in browser code. The app submits with network access disabled, bounded CPU, memory, stack and process limits, then polls the isolated judge for its result. Judge0's documented C and C++ language IDs are 50 and 54; use `JUDGE0_C_LANGUAGE_ID` and `JUDGE0_CPP_LANGUAGE_ID` to override them for another judge version.
+
+You can instead connect an isolated runner that implements the existing private API contract by setting `EXECUTION_MODE=runner-api`, `RUNNER_URL`, and `RUNNER_TOKEN`. The application calls `POST {RUNNER_URL}/v1/execute` with bearer authentication and JSON:
 
 ```json
 {
@@ -66,8 +76,12 @@ The judge must return JSON with `exitCode` (integer), `stdout` and `stderr` (str
 | `ATTACKS_PER_DETECTIVE` | Default per-player attack budget |
 | `REGISTRATION_OPEN` | `true` to accept team signups during the active event |
 | `TOURNAMENT_NAME` | Event initialized by the seed command |
-| `EXECUTION_MODE` | `disabled` (default) or `runner-api` |
-| `RUNNER_URL`, `RUNNER_TOKEN` | Private isolated judge endpoint and token |
+| `EXECUTION_MODE` | `judge0` or `runner-api`; unset remains disabled |
+| `JUDGE0_URL` | Judge0 API base URL (required in `judge0` mode) |
+| `JUDGE0_API_KEY`, `JUDGE0_RAPIDAPI_KEY` | Optional API credential for the selected Judge0 host |
+| `JUDGE0_C_LANGUAGE_ID`, `JUDGE0_CPP_LANGUAGE_ID` | C/C++ IDs (defaults 50 and 54) |
+| `JUDGE0_REQUEST_TIMEOUT_MS`, `JUDGE0_POLL_INTERVAL_MS` | Overall judge request and polling limits |
+| `RUNNER_URL`, `RUNNER_TOKEN` | Private isolated judge endpoint and token (`runner-api` mode) |
 | `CODE_TIMEOUT_MS`, `CODE_MEMORY_MB`, `CODE_OUTPUT_BYTES` | Default runner limits |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | Seed organizer credentials |
 
