@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d12">
+  <title>Find the Hacker — Competition Control Room</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#dashboard" aria-label="Find the Hacker home">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-name">find<span class="brand-accent">.</span>hacker</span>
+      </a>
+      <div class="event-switcher">
+        <div class="event-icon">F</div>
+        <div class="event-copy"><span class="eyebrow">EVENT WORKSPACE</span><strong>Tournament</strong></div>
+        <span class="chevron">⌄</span>
+      </div>
+      <div class="nav-label">Workspace</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">◫</span> Overview <span class="nav-count live-count">LIVE</span></button>
+        <button class="nav-item" data-view="match"><span class="nav-icon">⌘</span> My match <span class="nav-unread"></span></button>
+        <button class="nav-item" data-view="tournament"><span class="nav-icon">♧</span> Tournament</button>
+        <button class="nav-item" data-view="leaderboard"><span class="nav-icon">⌁</span> Leaderboard</button>
+        <button class="nav-item" data-view="results"><span class="nav-icon">✳</span> Results</button>
+      </nav>
+      <div class="nav-label nav-label-spaced">Manage</div>
+      <nav class="main-nav" aria-label="Management navigation">
+        <button class="nav-item" data-view="teams"><span class="nav-icon">♙</span> Teams</button>
+        <button class="nav-item" data-view="problems"><span class="nav-icon">▤</span> Problems</button>
+        <button class="nav-item" data-view="activity"><span class="nav-icon">◷</span> Activity log</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="help-card"><div class="help-icon">?</div><div><strong>Need a hand?</strong><span>Check the competition guide</span></div><span class="help-arrow">↗</span></div>
+        <button class="profile-button" id="profileButton"><span class="avatar avatar-lime">U</span><span class="profile-copy"><strong>Participant</strong><span>Team account</span></span><span class="profile-more">•••</span></button>
+      </div>
+    </aside>
+    <main class="main-content">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
+        <div class="breadcrumbs"><span>Tournament</span><span class="crumb-divider">/</span><strong id="breadcrumbCurrent">Overview</strong></div>
+        <div class="topbar-right"><div class="live-status"><span class="pulse-dot"></span> EVENT WORKSPACE</div><button class="icon-button" id="notificationsButton" aria-label="Notifications">♧<i></i></button><span class="topbar-divider"></span><button class="top-avatar">U</button></div>
+      </header>
+      <div class="page-wrap">
+        <section class="view active" id="view-dashboard"></section>
+                <section class="view" id="view-match"></section><section class="view" id="view-tournament"></section><section class="view" id="view-leaderboard"></section><section class="view" id="view-results"></section><section class="view" id="view-teams"></section><section class="view" id="view-problems"></section><section class="view" id="view-activity"></section>
+        <footer class="footer"><span><span class="footer-dot"></span> All systems operational</span><span>ICI TECHFEST '25 <i>·</i> FIND THE HACKER <i>·</i> ROUND 02</span><a href="#help" id="supportLink">Need help? <b>→</b></a></footer>
+      </div>
+    </main>
+  </div>
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+  <div class="login-screen" id="loginScreen" aria-hidden="true"><form class="login-card panel" id="loginForm"><a class="brand login-brand" href="#"><span class="brand-mark"><span></span><span></span><span></span></span><span class="brand-name">find<span class="brand-accent">.</span>hacker</span></a><div class="section-kicker">ICI TECHFEST '25 · COMPETITION PORTAL</div><h1>Welcome back.</h1><p>Sign in to enter your competition workspace.</p><label for="loginEmail">Email address</label><input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="you@team.com"><label for="loginPassword">Password</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="Your password"><div class="login-error" id="loginError" role="alert"></div><button class="button button-lime login-submit" type="submit">Sign in <span>→</span></button><small>Ask your event organizer if you need an account.</small></form></div>
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true"><section class="modal panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close" id="modalClose" aria-label="Close">×</button><div class="modal-symbol">⌘</div><div class="section-kicker" id="modalKicker">COMPETITION GUIDE</div><h2 id="modalTitle">Play sharp. Play fair.</h2><p id="modalCopy">Two teams. One challenge. The coder builds while the detective looks for a weakness using a limited set of controlled attacks.</p><div class="modal-steps"><div><span>01</span><p><b>Code the solution</b><small>Run your program against public tests.</small></p></div><div><span>02</span><p><b>Watch for changes</b><small>Detective attacks are limited and logged.</small></p></div><div><span>03</span><p><b>Submit before time</b><small>The server checks your solution against hidden tests.</small></p></div></div><button class="button button-lime modal-action" id="modalAction">Got it <span>→</span></button></section></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
