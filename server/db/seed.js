@@ -32,7 +32,7 @@ async function seed() {
     });
     console.log('Tournament and organizer account are ready. No sample teams, participant accounts, matches, or challenges were created.');
     console.log(`Organizer: ${process.env.SEED_ADMIN_EMAIL || 'admin@findhacker.local'} / ${process.env.SEED_ADMIN_PASSWORD || 'ChangeThisAdminPassword!'}`);
-    console.log('Teams register six participant accounts on the website. Each pair is automatically assigned coder and detective roles.');
+    console.log('Teams register three to five participant accounts on the website. Each pair is automatically assigned coder and detective roles.');
   } catch (error) {
     console.error('MongoDB seed failed:', error.stack || error);
     process.exitCode = 1;

@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { models } = require('../db');
 const { AppError } = require('../errors');
-const { registerTeam } = require('../services/teamRegistration');
+const { registerTeam, MIN_TEAM_SIZE, MAX_TEAM_SIZE } = require('../services/teamRegistration');
 
 const router = express.Router();
 const memberSchema = z.object({
@@ -15,7 +15,7 @@ const memberSchema = z.object({
 });
 const registrationSchema = z.object({
   teamName: z.string().trim().min(3).max(80),
-  members: z.array(memberSchema).length(6),
+  members: z.array(memberSchema).min(MIN_TEAM_SIZE).max(MAX_TEAM_SIZE),
 });
 const adminRegistrationSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -71,7 +71,8 @@ router.get('/status', async (_req, res, next) => {
       open: tournament.status === 'active' && tournament.config?.registrationOpen !== false,
       tournamentName: tournament.name,
       teamCount,
-      teamSize: 6,
+      teamSizeMin: MIN_TEAM_SIZE,
+      teamSizeMax: MAX_TEAM_SIZE,
     });
   } catch (error) {
     return next(error);
@@ -82,7 +83,7 @@ router.post('/', async (req, res, next) => {
   try {
     const parsed = registrationSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(400, parsed.error.issues[0]?.message || 'Check the team registration details.');
-    if (new Set(parsed.data.members.map((member) => member.email.toLowerCase())).size !== 6) {
+    if (new Set(parsed.data.members.map((member) => member.email.toLowerCase())).size !== parsed.data.members.length) {
       throw new AppError(400, 'Each participant must use a different email address.');
     }
     const result = await registerTeam({ name: parsed.data.teamName, members: parsed.data.members });

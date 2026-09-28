@@ -1,6 +1,6 @@
 # Find the Hacker
 
-Full-stack competition platform for teams of six. The Node.js service owns accounts, team isolation, match state and deadlines, submissions, attacks, scores, organizer actions, and the tournament record. MongoDB stores durable documents; Socket.IO publishes scoped live match events.
+Full-stack competition platform for teams of three to five. The Node.js service owns accounts, team isolation, match state and deadlines, submissions, attacks, scores, organizer actions, and the tournament record. MongoDB stores durable documents; Socket.IO publishes scoped live match events.
 
 ## Architecture and trust boundaries
 
@@ -27,10 +27,10 @@ Requirements: Node.js 20+, npm, Docker Engine with Compose, and a separate isola
 The seed creates the tournament, first round, and organizer account. It does not create fake teams, participant accounts, matches, or challenge data. Participants register through the website, and the organizer adds real challenges from the Problems section. Default local organizer credentials (change these before exposing the service):
 
 - Organizer: `admin@findhacker.local` / `ChangeThisAdminPassword!`
-- There are no participant demo accounts. Use **Register a team** on the sign-in screen to enroll a team and six individual participants.
+- There are no participant demo accounts. Use **Register a team** on the sign-in screen to enroll a team of three to five individual participants.
 - Use **Organizer registration** for additional administrator accounts. It requires the private `ADMIN_REGISTRATION_KEY` from `.env`; never publish or share that key publicly.
 
-The first participant is the team captain and is signed in after registration. Each participant can later sign in with their own email and password. Teams are paired in registration order when a second unpaired team completes registration. One team receives the coder role and the other receives the detective role; roles alternate across matches. The organizer creates challenges in **Problems**, assigns one to each ready match from the dashboard, then starts that match. Individual progress records are initialized for all 12 participants in a pair and updated as they save code, run tests, submit, or attack.
+The first participant is the team captain and is signed in after registration. Each participant can later sign in with their own email and password. Teams are paired in registration order when a second unpaired team completes registration. One team receives the coder role and the other receives the detective role; roles alternate across matches. The organizer creates challenges in **Problems**, assigns one to each ready match from the dashboard, then starts that match. Individual progress records are initialized for every member of both teams in a pair and updated as they save code, run tests, submit, or attack.
 
 ### Local Node process
 
@@ -80,7 +80,7 @@ Authenticated APIs accept the HTTP-only session cookie from the UI or an `Author
 | Method | Route | Access | Purpose |
 |---|---|---|---|
 | `GET` | `/api/registration/status` | Public | Registration availability and event name |
-| `POST` | `/api/registration` | Public, rate-limited | Register one team and six participant accounts; pair teams automatically |
+| `POST` | `/api/registration` | Public, rate-limited | Register one team and three to five participant accounts; pair teams automatically |
 | `POST` | `/api/registration/admin` | Public, invite-key protected | Register an organizer account |
 | `POST` | `/api/auth/login` | Public | Sign in |
 | `POST` | `/api/auth/logout` | User | Clear session cookie |

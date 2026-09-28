@@ -3,14 +3,15 @@ const bcrypt = require('bcryptjs');
 const { models, transaction } = require('../db');
 const { AppError } = require('../errors');
 
-const TEAM_SIZE = 6;
+const MIN_TEAM_SIZE = 3;
+const MAX_TEAM_SIZE = 5;
 
 function validateRoster(name, members) {
   if (typeof name !== 'string' || name.trim().length < 3 || name.trim().length > 80) {
     throw new AppError(400, 'Team name must be between 3 and 80 characters.');
   }
-  if (!Array.isArray(members) || members.length !== TEAM_SIZE) {
-    throw new AppError(400, 'Add exactly six participants to register a team.');
+  if (!Array.isArray(members) || members.length < MIN_TEAM_SIZE || members.length > MAX_TEAM_SIZE) {
+    throw new AppError(400, `Add between ${MIN_TEAM_SIZE} and ${MAX_TEAM_SIZE} participants to register a team.`);
   }
   const normalized = members.map((member) => ({
     name: typeof member.name === 'string' ? member.name.trim() : '',
@@ -24,7 +25,7 @@ function validateRoster(name, members) {
   if (normalized.some((member) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member.email) || member.email.length > 254)) {
     throw new AppError(400, 'Enter a valid email address for each participant.');
   }
-  if (new Set(emails).size !== TEAM_SIZE) throw new AppError(400, 'Each participant must use a different email address.');
+  if (new Set(emails).size !== normalized.length) throw new AppError(400, 'Each participant must use a different email address.');
   if (normalized.some((member) => member.password.length < 12 || member.password.length > 200)) {
     throw new AppError(400, 'Each participant password must be at least 12 characters.');
   }
@@ -40,6 +41,9 @@ async function registerTeam({ tournamentId, name, groupName, members, allowClose
     if (!tournament) throw new AppError(404, 'Team registration is not available because no tournament is open.');
     if (!allowClosed && (tournament.status !== 'active' || tournament.config?.registrationOpen === false)) {
       throw new AppError(409, 'Team registration is currently closed.');
+    }
+    if (await models.Team.countDocuments({ tournament_id: tournament._id }).session(session) >= 60) {
+      throw new AppError(409, 'This tournament has reached its 60-team registration limit.');
     }
 
     // Touch one tournament document in every registration transaction. MongoDB retries write conflicts,
@@ -130,4 +134,4 @@ async function registerTeam({ tournamentId, name, groupName, members, allowClose
   });
 }
 
-module.exports = { registerTeam, validateRoster };
+module.exports = { registerTeam, validateRoster, MIN_TEAM_SIZE, MAX_TEAM_SIZE };
