@@ -185,7 +185,7 @@ async function registerCaptainTeam({ name, members }) {
 async function joinTeam({ code, email, password }) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   return transaction(async (session) => {
-    const tournament = await findOpenTournament(session, null, true);
+    let tournament = await findOpenTournament(session, null, true);
     if (tournament.status !== 'active') throw new AppError(409, 'This event is no longer accepting team members.');
     const team = await models.Team.findOne({ tournament_id: tournament._id, code: String(code).trim(), status: 'pending' }).session(session);
     const slot = team?.members.find((member) => String(member.email || '').trim().toLowerCase() === normalizedEmail && !member.user_id);
