@@ -80,7 +80,7 @@ router.post('/admin', teamRegistrationLimit, async (req, res, next) => {
 
 router.get('/status', async (_req, res, next) => {
   try {
-    const tournament = await models.Tournament.findOne({ status: { $in: ['setup', 'active'] } }).sort({ createdAt: 1 }).lean();
+    const tournament = await models.Tournament.findOne({ status: { $in: ['setup', 'active'] } }).sort({ createdAt: -1 }).lean();
     if (!tournament) return res.json({ open: false, tournamentName: null, teamCount: 0 });
     const teamCount = await models.Team.countDocuments({ tournament_id: tournament._id });
     return res.json({

@@ -109,7 +109,7 @@ async function pairWaitingTeamsWithDetails(tournament, session) {
 async function findOpenTournament(session, tournamentId, allowClosed) {
   const tournament = tournamentId
     ? await models.Tournament.findById(tournamentId).session(session)
-    : await models.Tournament.findOne({ status: { $in: ['setup', 'active'] } }).sort({ createdAt: 1 }).session(session);
+    : await models.Tournament.findOne({ status: { $in: ['setup', 'active'] } }).sort({ createdAt: -1 }).session(session);
   if (!tournament) throw new AppError(404, 'Team registration is not available because no tournament is open.');
   if (!allowClosed && (tournament.status !== 'active' || tournament.config?.registrationOpen === false)) {
     throw new AppError(409, 'Team registration is currently closed.');
