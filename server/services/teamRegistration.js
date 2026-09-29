@@ -187,8 +187,8 @@ async function joinTeam({ code, email, password }) {
   return transaction(async (session) => {
     const tournament = await findOpenTournament(session, null, true);
     if (tournament.status !== 'active') throw new AppError(409, 'This event is no longer accepting team members.');
-    const team = await models.Team.findOne({ tournament_id: tournament._id, code, status: 'pending' }).session(session);
-    const slot = team?.members.find((member) => member.email === normalizedEmail && !member.user_id);
+    const team = await models.Team.findOne({ tournament_id: tournament._id, code: String(code).trim(), status: 'pending' }).session(session);
+    const slot = team?.members.find((member) => String(member.email || '').trim().toLowerCase() === normalizedEmail && !member.user_id);
     if (!slot || await models.User.exists({ email: normalizedEmail }).session(session)) {
       throw new AppError(400, 'The team code or roster email is incorrect, or this member has already joined.', 'TEAM_JOIN_FAILED');
     }
