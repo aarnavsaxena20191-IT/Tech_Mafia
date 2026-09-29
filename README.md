@@ -7,7 +7,7 @@ Full-stack competition platform for teams of three to five. The Node.js service 
 - **Browser:** responsive participant and organizer interface. Browsers are clients only; the server checks every match action and uses database timestamps for deadlines.
 - **API:** Express, JSON validation, rate limits, HTTP-only session cookie, JWT bearer support, role checks, audit events, and Socket.IO authentication.
 - **Database:** MongoDB models in `server/db/models.js`. Users, teams, tournaments, rounds, problems, matches, participant progress, scores, final competitions, and audit logs are separate collections. Every participant gets an individual progress record for each paired match. Code saves, public runs, submissions, attacks, role, and a capped activity history are persisted there.
-- **Code judge:** `server/sandbox/runner.js` speaks to a separate authenticated runner API. Execution is **disabled by default** and fails closed. Do not point this at an ordinary web process or run participant code inside the application container. A production judge must isolate every job with no network, CPU/memory/process/time/output limits, temporary storage, and a disposable filesystem. Its API contract is described below.
+- **Code judge:** `server/sandbox/runner.js` sends C/C++ submissions to an isolated Judge0 service (or a separately configured private runner). Participant code never runs in the application container. The four-digit team code is shared only with team members, is rate-limited on join, and is not included in public team listings.
 
 ## Run locally
 
@@ -24,13 +24,13 @@ Requirements: Node.js 20+, npm, Docker Engine with Compose, and a separate isola
 
 4. Open `http://localhost:3000`. Health check: `http://localhost:3000/health`.
 
-The seed creates the tournament, first round, and organizer account. It does not create fake teams, participant accounts, matches, or challenge data. Participants register through the website, and the organizer adds real challenges from the Problems section. Default local organizer credentials (change these before exposing the service):
+The seed creates the tournament, first round, and organizer account. It does not create fake teams, participant accounts, matches, or challenge data. The captain registers the roster (three to five people) and receives a four-digit team code. Teammates select **Join a team with a code**, enter the roster email and code, then set their own password. The team is paired after all listed members join. The organizer adds real challenges from the Problems section. Default local organizer credentials (change these before exposing the service):
 
 - Organizer: `admin@findhacker.local` / `ChangeThisAdminPassword!`
-- There are no participant demo accounts. Use **Register a team** on the sign-in screen to enroll a team of three to five individual participants.
+- There are no participant demo accounts. Use **Register a new team** to create a roster, then share the generated code with those teammates only.
 - Use **Organizer registration** for additional administrator accounts. It requires the private `ADMIN_REGISTRATION_KEY` from `.env`; never publish or share that key publicly.
 
-The first participant is the team captain and is signed in after registration. Each participant can later sign in with their own email and password. Teams are paired in registration order when a second unpaired team completes registration. One team receives the coder role and the other receives the detective role; roles alternate across matches. The organizer creates challenges in **Problems**, assigns one to each ready match from the dashboard, then starts that match. Individual progress records are initialized for every member of both teams in a pair and updated as they save code, run tests, submit, or attack.
+The captain registers the team name and a roster of three to five members, including each member's name and email. The captain receives a unique four-digit team code. Teammates select **Join a team with a code**, enter that code and the email on the roster, and create their own password. A team is paired only after all roster members have joined. Teams are paired in registration order; one receives the coder role and the other receives the detective role. The organizer creates challenges in **Problems**, assigns one to each ready match from the dashboard, then starts that match. Individual progress records are initialized for every member of both teams in a pair and updated as they save code, run tests, submit, or attack.
 
 ### Local Node process
 
@@ -94,7 +94,8 @@ Authenticated APIs accept the HTTP-only session cookie from the UI or an `Author
 | Method | Route | Access | Purpose |
 |---|---|---|---|
 | `GET` | `/api/registration/status` | Public | Registration availability and event name |
-| `POST` | `/api/registration` | Public, rate-limited | Register one team and three to five participant accounts; pair teams automatically |
+| `POST` | `/api/registration` | Public, rate-limited | Captain registers a three to five person roster and receives the team's four-digit code |
+| `POST` | `/api/registration/join` | Public, rate-limited | A rostered teammate joins with the four-digit code and email, then creates a password |
 | `POST` | `/api/registration/admin` | Public, invite-key protected | Register an organizer account |
 | `POST` | `/api/auth/login` | Public | Sign in |
 | `POST` | `/api/auth/logout` | User | Clear session cookie |
