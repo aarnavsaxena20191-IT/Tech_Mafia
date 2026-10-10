@@ -24,7 +24,7 @@ async function judge0Execute({language,sourceCode,input,limits={},baseUrl,header
   const response=await fetch(`${base}/submissions?base64_encoded=false&wait=false`,{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify({language_id:languageId,source_code:sourceCode,stdin:input,cpu_time_limit:cpuSeconds,cpu_extra_time:1,wall_time_limit:Math.min(cpuSeconds+3,20),memory_limit:memoryKb,stack_limit:Math.min(memoryKb,65536),max_processes_and_or_threads:20,enable_network:false}),signal:controller.signal});
   if(!response.ok){const body=await response.text();throw new AppError(response.status===429||response.status===503?503:502,`Judge service refused the run (${response.status}). ${body.slice(0,300)}`,'RUNNER_ERROR')}
   const created=await response.json();
-  if(created.status?.id)return normalizeJudge0(created);
+  if(Number.isInteger(created.status?.id)&&created.status.id>=3)return normalizeJudge0(created);
   if(!created.token)throw new AppError(502,'Judge did not return a submission token.','RUNNER_ERROR');
   const pollEvery=bounded(process.env.JUDGE0_POLL_INTERVAL_MS,200,2000,400);
   const deadline=Date.now()+totalWaitMs-1000;
