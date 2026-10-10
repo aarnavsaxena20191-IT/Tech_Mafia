@@ -108,6 +108,7 @@ Authenticated APIs accept the HTTP-only session cookie from the UI or an `Author
 | `POST` | `/api/matches/:id/attacks` | Detective | Apply one allowlisted change |
 | `POST` | `/api/matches/:id/start`, `/pause`, `/end` | Admin | Control or override match |
 | `PATCH` | `/api/matches/:id/problem` | Admin | Assign or clear the challenge before a match starts |
+| `POST` | `/api/matches/:id/rematch` | Admin | Create a new match using a completed match's teams and roles, with a selected active challenge |
 | `GET` | `/api/matches/:id/attacks` | Participant/admin | Redacted history for teams; attribution for admins |
 | `GET` | `/api/tournament/overview`, `/rounds`, `/standings`, `/groups/:name` | User/admin | Event status and standings |
 | `POST` | `/api/tournament/teams`, `/rounds`, `/matches`, `/advance` | Admin | Register a team or configure tournament progression |
