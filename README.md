@@ -76,7 +76,7 @@ The judge must return JSON with `exitCode` (integer), `stdout` and `stderr` (str
 | `ATTACKS_PER_DETECTIVE` | Default per-player attack budget |
 | `REGISTRATION_OPEN` | `true` to accept team signups during the active event |
 | `TOURNAMENT_NAME` | Event initialized by the seed command |
-| `EXECUTION_MODE` | `judge0` or `runner-api`; unset remains disabled |
+| `EXECUTION_MODE` | `judge0`, `runner-api`, or `enabled`; `enabled` selects Judge0 when `JUDGE0_URL` is set, otherwise the private runner when both `RUNNER_URL` and `RUNNER_TOKEN` are set. Unset remains disabled. |
 | `JUDGE0_URL` | Judge0 API base URL (required in `judge0` mode) |
 | `JUDGE0_API_KEY`, `JUDGE0_RAPIDAPI_KEY` | Optional API credential for the selected Judge0 host |
 | `JUDGE0_C_LANGUAGE_ID`, `JUDGE0_CPP_LANGUAGE_ID` | C/C++ IDs (defaults 50 and 54) |

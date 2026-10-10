@@ -40,13 +40,15 @@ async function judge0Execute({language,sourceCode,input,limits={},baseUrl,header
 }
 
 async function execute({language,sourceCode,input,limits={}}){
- const mode=process.env.EXECUTION_MODE||'disabled';
+ let mode=process.env.EXECUTION_MODE||'disabled';
+ if(mode==='enabled')mode=process.env.JUDGE0_URL?'judge0':process.env.RUNNER_URL&&process.env.RUNNER_TOKEN?'runner-api':'enabled';
  if(mode==='judge0'){
   if(!process.env.JUDGE0_URL)throw new AppError(503,'Code execution is not configured. Set JUDGE0_URL to your Judge0 API endpoint.','RUNNER_UNAVAILABLE');
   const headers={};if(process.env.JUDGE0_API_KEY)headers['X-Auth-Token']=process.env.JUDGE0_API_KEY;
   if(process.env.JUDGE0_RAPIDAPI_KEY){headers['X-RapidAPI-Key']=process.env.JUDGE0_RAPIDAPI_KEY;headers['X-RapidAPI-Host']=process.env.JUDGE0_RAPIDAPI_HOST||new URL(process.env.JUDGE0_URL).hostname}
   return judge0Execute({language,sourceCode,input,limits,baseUrl:process.env.JUDGE0_URL,headers});
  }
+ if(mode==='enabled')throw new AppError(503,'Code execution is marked enabled, but no judge is configured. Set JUDGE0_URL or both RUNNER_URL and RUNNER_TOKEN.','RUNNER_UNAVAILABLE');
  if(mode!=='runner-api'||!process.env.RUNNER_URL||!process.env.RUNNER_TOKEN)throw new AppError(503,'Code execution is not configured. Configure an isolated Judge0 service before enabling matches.','RUNNER_UNAVAILABLE');
  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),Number(process.env.CODE_TIMEOUT_MS||3000)+1000);
  try{const response=await fetch(`${process.env.RUNNER_URL.replace(/\/$/,'')}/v1/execute`,{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${process.env.RUNNER_TOKEN}`},body:JSON.stringify({language,sourceCode,input,limits:{timeMs:Number(limits.timeMs||process.env.CODE_TIMEOUT_MS||3000),memoryMb:Number(limits.memoryMb||process.env.CODE_MEMORY_MB||128),outputBytes:Number(process.env.CODE_OUTPUT_BYTES||65536),network:false}}),signal:controller.signal});if(!response.ok)throw new AppError(502,'Isolated runner rejected the execution request.','RUNNER_ERROR');return await response.json()}catch(error){if(error.name==='AbortError')throw new AppError(504,'Code execution timed out.','EXECUTION_TIMEOUT');throw error}finally{clearTimeout(timeout)}
