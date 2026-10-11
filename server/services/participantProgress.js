@@ -1,10 +1,10 @@
 const { models } = require('../db');
 const { getTeamForUser } = require('./identity');
 
-async function recordProgress(userId, matchId, { type, detail = {}, sourceCode, language, revision, passedTests } = {}) {
-  const team = await getTeamForUser(userId);
+async function recordProgress(userId, matchId, { type, detail = {}, sourceCode, language, revision, passedTests } = {}, context = {}) {
+  const team = context.team || await getTeamForUser(userId);
   if (!team) return null;
-  const match = await models.Match.findOne({ _id: matchId, 'participants.team_id': team.id })
+  const match = context.match || await models.Match.findOne({ _id: matchId, 'participants.team_id': team.id })
     .select('tournament_id participants')
     .lean();
   const participant = match?.participants.find((entry) => entry.team_id === team.id);
@@ -20,7 +20,7 @@ async function recordProgress(userId, matchId, { type, detail = {}, sourceCode, 
   if (language) set.language = language;
   if (Number.isInteger(revision)) set.revision = revision;
 
-  return models.ParticipantProgress.findOneAndUpdate(
+  const update = models.ParticipantProgress.findOneAndUpdate(
     { match_id: matchId, user_id: userId },
     {
       $setOnInsert: {
@@ -34,6 +34,8 @@ async function recordProgress(userId, matchId, { type, detail = {}, sourceCode, 
     },
     { upsert: true, returnDocument: 'after', runValidators: true },
   );
+  if (context.session) update.session(context.session);
+  return update;
 }
 
 module.exports = { recordProgress };

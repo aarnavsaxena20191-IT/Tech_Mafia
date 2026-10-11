@@ -22,21 +22,21 @@ const teamJoinEmailLimit = rateLimit({
 const memberSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(254),
-  password: z.string().max(200).optional(),
+  password: z.string().length(4, 'Passwords must be exactly 4 characters.').optional(),
 });
 const registrationSchema = z.object({
   teamName: z.string().trim().min(3).max(80),
   members: z.array(memberSchema).min(MIN_TEAM_SIZE).max(MAX_TEAM_SIZE),
 }).superRefine((data, context) => {
-  if (!data.members[0]?.password || data.members[0].password.length < 12) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['members', 0, 'password'], message: 'The captain password must be at least 12 characters.' });
+  if (!data.members[0]?.password || data.members[0].password.length !== 4) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['members', 0, 'password'], message: 'The captain password must be exactly 4 characters.' });
   }
 });
-const joinSchema = z.object({ code: z.string().regex(/^\d{4}$/), email: z.string().trim().email().max(254), password: z.string().min(12).max(200) });
+const joinSchema = z.object({ code: z.string().regex(/^\d{4}$/), email: z.string().trim().email().max(254), password: z.string().length(4, 'Passwords must be exactly 4 characters.') });
 const adminRegistrationSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(254),
-  password: z.string().min(16).max(200),
+  password: z.string().length(4, 'Passwords must be exactly 4 characters.'),
   inviteCode: z.string().min(1).max(256),
 });
 
@@ -132,7 +132,7 @@ router.post('/', teamRegistrationLimit, async (req, res, next) => {
 router.post('/join', teamJoinIpLimit, teamJoinEmailLimit, async (req, res, next) => {
   try {
     const parsed = joinSchema.safeParse(req.body);
-    if (!parsed.success) throw new AppError(400, parsed.error.issues[0]?.message || 'Enter your four-digit team code, roster email, and a password of at least 12 characters.');
+    if (!parsed.success) throw new AppError(400, parsed.error.issues[0]?.message || 'Enter your four-digit team code, roster email, and a password of exactly 4 characters.');
     const result = await joinTeam(parsed.data);
     const user = result.user;
     const token = jwt.sign(

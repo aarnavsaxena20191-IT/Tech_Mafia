@@ -28,9 +28,9 @@ function validateRoster(name, members, { captainOnly = false } = {}) {
     throw new AppError(400, 'Each participant must use a different email address.');
   }
   const passwordInvalid = captainOnly
-    ? normalized[0].password.length < 12 || normalized[0].password.length > 200
-    : normalized.some((member) => member.password.length < 12 || member.password.length > 200);
-  if (passwordInvalid) throw new AppError(400, captainOnly ? 'The captain password must be at least 12 characters.' : 'Each participant password must be at least 12 characters.');
+    ? normalized[0].password.length !== 4
+    : normalized.some((member) => member.password.length !== 4);
+  if (passwordInvalid) throw new AppError(400, captainOnly ? 'The captain password must be exactly 4 characters.' : 'Each participant password must be exactly 4 characters.');
   return { name: name.trim(), members: normalized };
 }
 
