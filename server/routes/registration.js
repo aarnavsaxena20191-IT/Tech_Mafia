@@ -10,7 +10,6 @@ const { registerCaptainTeam, joinTeam, MIN_TEAM_SIZE, MAX_TEAM_SIZE } = require(
 
 const router = express.Router();
 const teamRegistrationLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
-const teamJoinIpLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 360, standardHeaders: 'draft-7', legacyHeaders: false });
 const teamJoinEmailLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 8,
@@ -80,11 +79,12 @@ router.post('/admin', teamRegistrationLimit, async (req, res, next) => {
 
 router.get('/status', async (_req, res, next) => {
   try {
-    const tournament = await models.Tournament.findOne({ status: { $in: ['setup', 'active'] } }).sort({ createdAt: -1 }).lean();
+    const tournament = await models.Tournament.findOne({ status: 'active' }).sort({ createdAt: -1 }).lean()
+      || await models.Tournament.findOne({ status: 'setup' }).sort({ createdAt: -1 }).lean();
     if (!tournament) return res.json({ open: false, tournamentName: null, teamCount: 0 });
     const teamCount = await models.Team.countDocuments({ tournament_id: tournament._id });
     return res.json({
-      open: tournament.status === 'active' && tournament.config?.registrationOpen !== false,
+      open: tournament.status === 'active',
       tournamentName: tournament.name,
       teamCount,
       teamSizeMin: MIN_TEAM_SIZE,
@@ -129,7 +129,7 @@ router.post('/', teamRegistrationLimit, async (req, res, next) => {
   }
 });
 
-router.post('/join', teamJoinIpLimit, teamJoinEmailLimit, async (req, res, next) => {
+router.post('/join', teamJoinEmailLimit, async (req, res, next) => {
   try {
     const parsed = joinSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(400, parsed.error.issues[0]?.message || 'Enter your four-digit team code, roster email, and a password of exactly 4 characters.');
