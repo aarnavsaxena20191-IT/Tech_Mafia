@@ -1,6 +1,6 @@
 const $=(s,root=document)=>root.querySelector(s),$$=(s,root=document)=>[...root.querySelectorAll(s)];
 const app={view:'dashboard',seconds:0,matchEndsAt:null,attacks:0,runCount:0,language:'C++',currentMatchId:null,token:null,user:null,team:null,socket:null,onlineUsers:new Map(),saveTimer:null,saveQueue:new Map(),publicPassKey:null,matchState:null,matchRole:null,code:{'C':'','C++':''}};
-async function api(path,options={}){const response=await fetch(`/api${path}`,{credentials:'same-origin',headers:{'content-type':'application/json',...(app.token?{authorization:`Bearer ${app.token}`}:{})},...options});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error?.message||`Request failed (${response.status})`);return data}
+async function api(path,options={}){const response=await fetch(`/api${path}`,{credentials:'same-origin',headers:{'content-type':'application/json',...(app.token?{authorization:`Bearer ${app.token}`}:{})},...options});const data=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(data.error?.message||`Request failed (${response.status})`);error.status=response.status;throw error}return data}
 const teams=[{rank:1,name:'Runtime Terrors',tag:'RT',points:'1,860',record:'5–0',change:'↑ 2',color:'lime'},{rank:2,name:'Stack Smashers',tag:'SS',points:'1,720',record:'4–1',change:'↑ 1',color:'violet'},{rank:3,name:'Ctrl Alt Elite',tag:'CE',points:'1,580',record:'4–1',change:'↑ 4',color:'blue'},{rank:4,name:'Bug Bounty Hunters',tag:'BH',points:'1,460',record:'4–1',change:'↓ 1',color:'yellow'},{rank:5,name:'Null Pointers',tag:'NP',points:'1,380',record:'3–2',change:'↑ 2',color:'salmon'},{rank:8,name:'Byte Me',tag:'BM',points:'1,240',record:'3–1',change:'↑ 3',color:'lime',you:true},{rank:9,name:'Syntax Squad',tag:'SQ',points:'1,180',record:'3–2',change:'—',color:'violet'},{rank:10,name:'404 Brain Not Found',tag:'404',points:'1,120',record:'3–2',change:'↓ 2',color:'blue'}];
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function updateOrganizerPresence(){
@@ -73,7 +73,7 @@ async function establishSession(){
  if(app.socket){
   if(app.user.role==='admin'){app.socket.on('presence:snapshot',users=>{app.onlineUsers.clear();for(const user of users||[])app.onlineUsers.set(user.userId,user);updateOrganizerPresence()});app.socket.on('presence:changed',presence=>{if(presence.online)app.onlineUsers.set(presence.userId,presence);else app.onlineUsers.delete(presence.userId);updateOrganizerPresence()})}
   app.socket.on('connect',()=>{if(app.currentMatchId)app.socket.emit('match:join',{matchId:app.currentMatchId})});
-  app.socket.on('code:changed',event=>{if(event.matchId!==app.currentMatchId||typeof event.sourceCode!=='string'||app.user.role==='admin')return;const area=$('#codeArea');const localCoderIsEditing=app.matchRole==='CODER'&&document.activeElement===area;if(area&&!localCoderIsEditing){area.value=event.sourceCode;app.code[event.language==='c'?'C':'C++']=event.sourceCode;app.publicPassKey=null;if($('#submitCode'))$('#submitCode').disabled=true}});
+  app.socket.on('code:changed',event=>{if(event.matchId!==app.currentMatchId||typeof event.sourceCode!=='string'||app.user.role==='admin')return;const area=$('#codeArea');const localCoderIsEditing=app.matchRole==='CODER'&&document.activeElement===area;const isAttack=event.attack===true;if((!localCoderIsEditing||isAttack)&&Number.isInteger(event.revision))app.codeRevision=event.revision;if(area&&(!localCoderIsEditing||isAttack)){if(isAttack){clearTimeout(app.saveTimer);const queue=app.saveQueue.get(event.matchId);if(queue)queue.pending=null}area.value=event.sourceCode;app.code[event.language==='c'?'C':'C++']=event.sourceCode;app.publicPassKey=null;if($('#submitCode'))$('#submitCode').disabled=true}});
   app.socket.on('match:completed',event=>showMatchResult(event));
   app.socket.on('attack:applied',event=>{if(event.matchId===app.currentMatchId&&app.user?.role==='admin')toast('A controlled attack was applied');if(event.matchId===app.currentMatchId&&event.sourceCode){const area=$('#codeArea');if(area){area.value=event.sourceCode;app.code[app.language]=event.sourceCode;app.publicPassKey=null;if($('#submitCode'))$('#submitCode').disabled=true}}});
  }
@@ -87,17 +87,20 @@ function saveMatchCode(id,sourceCode,language){
   if(queue.inFlight)return;
   const flush=async()=>{
     if(!queue.pending)return;
-    const snapshot=queue.pending;
+    const snapshot={...queue.pending,expectedRevision:app.codeRevision||0};
     queue.pending=null;
     queue.inFlight=true;
     try{
       const saved=await api(`/matches/${id}/code`,{method:'PUT',body:JSON.stringify(snapshot)});
+      if(app.currentMatchId===id)app.codeRevision=Math.max(app.codeRevision||0,saved.revision||0);
       const area=$('#codeArea');
       if(app.currentMatchId===id&&area?.value===snapshot.sourceCode&&!queue.pending)
         $('.editor-bottom span:first-child').innerHTML=`<i></i> Saved - revision ${saved.revision}`;
     }catch(error){
       const area=$('#codeArea');
-      if(app.currentMatchId===id&&area?.value===snapshot.sourceCode&&!queue.pending)
+      if(error.status===409&&error.message.startsWith('The shared code changed')){
+        try{const latest=await api(`/matches/${id}`);if(app.currentMatchId===id){app.codeRevision=latest.match.revision||0;if(!queue.pending&&area?.value===snapshot.sourceCode){area.value=latest.match.source_code||'';app.code[latest.match.language==='c'?'C':'C++']=area.value;app.publicPassKey=null;if($('#submitCode'))$('#submitCode').disabled=true}}}catch{}
+      }else if(app.currentMatchId===id&&area?.value===snapshot.sourceCode&&!queue.pending)
         $('.editor-bottom span:first-child').innerHTML=`<i style="background:#ff9b80"></i> ${escapeHtml(error.message)}`;
     }finally{
       queue.inFlight=false;
@@ -110,8 +113,9 @@ function saveMatchCode(id,sourceCode,language){
 async function loadMatch(id){
   try{
     const data=await api(`/matches/${id}`);
-    app.currentMatchId=id;
+  app.currentMatchId=id;
     const match=data.match;
+    app.codeRevision=match.revision||0;
     app.matchState=match.state;
     app.matchEndsAt=match.ends_at?new Date(match.ends_at).getTime():null;
     app.matchRole=match.own_role;
