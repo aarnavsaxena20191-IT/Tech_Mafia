@@ -42,76 +42,15 @@ async function createUniqueTeamCode(tournamentId, session) {
   throw new AppError(503, 'Could not create a team code. Please try again.', 'TEAM_CODE_UNAVAILABLE');
 }
 
-async function pairWaitingTeams(tournament, session) {
-  const allTeams = await models.Team.find({ tournament_id: tournament._id, status: 'active' }).sort({ createdAt: 1, _id: 1 }).session(session).lean();
-  const existingMatches = await models.Match.find({ tournament_id: tournament._id }).select('participants.team_id match_number').session(session).lean();
-  const pairedIds = new Set(existingMatches.flatMap((match) => match.participants.map((participant) => participant.team_id)));
-  const waitingTeams = allTeams.filter((team) => team.members.length >= MIN_TEAM_SIZE && team.members.every((member) => member.user_id) && !pairedIds.has(team._id));
-  if (waitingTeams.length < 2) return null;
-
-  const [first, second] = waitingTeams;
-  let round = await models.Round.findOne({ tournament_id: tournament._id, round_number: 1 }).session(session);
-  if (!round) {
-    [round] = await models.Round.create([{
-      tournament_id: tournament._id,
-      name: 'Qualifiers',
-      round_number: 1,
-      kind: 'bracket',
-      status: 'active',
-    }], { session });
-  }
-  const matchNumber = existingMatches.reduce((max, match) => Math.max(max, match.match_number || 0), 0) + 1;
-  const flip = matchNumber % 2 === 0;
-  const problem = await models.Problem.findOne({ is_active: true }).sort({ createdAt: 1 }).select('_id').session(session).lean();
-  const [match] = await models.Match.create([{
-    tournament_id: tournament._id,
-    round_id: round._id,
-    problem_id: problem?._id || null,
-    match_number: matchNumber,
-    duration_seconds: Number(tournament.config?.matchDurationSeconds || process.env.MATCH_DURATION_SECONDS || 900),
-    state: 'READY',
-    participants: [
-      { team_id: first._id, role: flip ? 'DETECTIVE' : 'CODER' },
-      { team_id: second._id, role: flip ? 'CODER' : 'DETECTIVE' },
-    ],
-  }], { session });
-  const initialProgress = [first, second].flatMap((team) => {
-    const role = match.participants.find((participant) => participant.team_id === team._id).role;
-    return team.members.map((member) => ({
-      tournament_id: tournament._id,
-      match_id: match._id,
-      team_id: team._id,
-      user_id: member.user_id,
-      role,
-      events: [{ type: 'match_assigned', detail: { role } }],
-    }));
-  });
-  await models.ParticipantProgress.insertMany(initialProgress, { session });
-  return { matchId: match._id, matchNumber };
-}
-
-function pairingForTeam(pairing, teamId) {
-  if (!pairing) return null;
-  const own = pairing.teams.find((team) => team.id === teamId);
-  const opponent = pairing.teams.find((team) => team.id !== teamId);
-  return { matchId: pairing.matchId, matchNumber: pairing.matchNumber, role: own.role, opponent: opponent.name };
-}
-
-async function pairWaitingTeamsWithDetails(tournament, session) {
-  const pairing = await pairWaitingTeams(tournament, session);
-  if (!pairing) return null;
-  const match = await models.Match.findById(pairing.matchId).session(session).lean();
-  const teamIds = match.participants.map((participant) => participant.team_id);
-  const teams = await models.Team.find({ _id: { $in: teamIds } }).select('_id name').session(session).lean();
-  return { ...pairing, teams: teams.map((team) => ({ id: team._id, name: team.name, role: match.participants.find((participant) => participant.team_id === team._id).role })) };
-}
-
 async function findOpenTournament(session, tournamentId, allowClosed) {
   const tournament = tournamentId
     ? await models.Tournament.findById(tournamentId).session(session)
-    : await models.Tournament.findOne({ status: { $in: ['setup', 'active'] } }).sort({ createdAt: -1 }).session(session);
+    : await models.Tournament.findOne({ status: 'active' }).sort({ createdAt: -1 }).session(session)
+      || await models.Tournament.findOne({ status: 'setup' }).sort({ createdAt: -1 }).session(session);
   if (!tournament) throw new AppError(404, 'Team registration is not available because no tournament is open.');
-  if (!allowClosed && (tournament.status !== 'active' || tournament.config?.registrationOpen === false)) {
+  // Keep captain registration open throughout the active event, including after
+  // match play begins. registrationOpen is advisory UI state, not a signup gate.
+  if (!allowClosed && tournament.status !== 'active') {
     throw new AppError(409, 'Team registration is currently closed.');
   }
   return tournament;
@@ -145,8 +84,7 @@ async function registerTeam({ tournamentId, name, groupName, members, allowClose
       status: 'active',
       members: users.map((user, index) => ({ user_id: user._id, name: roster.members[index].name, email: roster.members[index].email, member_number: index + 1, joined_at: new Date() })),
     }], { session });
-    const details = await pairWaitingTeamsWithDetails(tournament, session);
-    return { tournament, team, users, pairing: pairingForTeam(details, team._id) };
+    return { tournament, team, users, pairing: null };
   });
 }
 
@@ -206,9 +144,7 @@ async function joinTeam({ code, email, password }) {
     if (team.status === 'active') {
       tournament = await models.Tournament.findByIdAndUpdate(tournament._id, { $inc: { registration_sequence: 1 } }, { returnDocument: 'after', session });
     }
-    const pairingDetails = team.status === 'active' ? await pairWaitingTeamsWithDetails(tournament, session) : null;
-    const pairing = pairingForTeam(pairingDetails, team._id);
-    return { tournament, team, user, pairing };
+    return { tournament, team, user, pairing: null };
   });
 }
 
