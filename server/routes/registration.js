@@ -9,7 +9,8 @@ const { AppError } = require('../errors');
 const { registerCaptainTeam, joinTeam, MIN_TEAM_SIZE, MAX_TEAM_SIZE } = require('../services/teamRegistration');
 
 const router = express.Router();
-const teamRegistrationLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
+const rateLimitResponse = (req, res, message) => res.status(429).json({ error: { code: 'RATE_LIMITED', message, requestId: req.id } });
+const teamRegistrationLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false, handler: (req, res) => rateLimitResponse(req, res, 'Too many team registrations from this network. Try again later.') });
 const teamJoinEmailLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 8,
@@ -17,6 +18,7 @@ const teamJoinEmailLimit = rateLimit({
   keyGenerator: (req) => crypto.createHash('sha256').update(String(req.body?.email || '').trim().toLowerCase()).digest('hex'),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  handler: (req, res) => rateLimitResponse(req, res, 'Too many failed join attempts for this email. Check the team code and roster email, then try again later.'),
 });
 const memberSchema = z.object({
   name: z.string().trim().min(2).max(80),

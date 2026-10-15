@@ -8,11 +8,7 @@ function isTransientJudgeStatus(status){return status===408||status===425||statu
 function retryDelay(response,fallback){const value=response.headers?.get?.('retry-after');if(value){const seconds=Number(value);const date=Number.isFinite(seconds)?seconds*1000:Date.parse(value)-Date.now();if(Number.isFinite(date)&&date>0)return Math.min(date,5000)}return fallback}
 function judgeLookupError(status,body=''){let detail='';try{const parsed=JSON.parse(body);detail=String(parsed.error||parsed.message||'')}catch{detail=String(body||'')}detail=detail.replace(/\s+/g,' ').trim().slice(0,180);if(status===401||status===403)return new AppError(502,`Judge result lookup was rejected (HTTP ${status}). Verify the Judge0 credentials and host in the Render environment.`,'RUNNER_ERROR');if(status===404)return new AppError(502,`Judge result lookup failed (HTTP 404). Verify JUDGE0_URL is the API base URL and that the same host handles submission and polling.${detail?` Judge response: ${detail}`:''}`,'RUNNER_ERROR');if(status===400)return new AppError(502,`Judge rejected its result lookup (HTTP 400). Check JUDGE0_URL and the provider response${detail?`: ${detail}`:'.'}`,'RUNNER_ERROR');return new AppError(502,`Judge result lookup failed (HTTP ${status})${detail?`: ${detail}`:'.'}`,'RUNNER_ERROR')}
 function judgeApiBase(value){let url;try{url=new URL(value)}catch{throw new AppError(503,'JUDGE0_URL must be a valid Judge0 API base URL.','RUNNER_UNAVAILABLE')}if(!['http:','https:'].includes(url.protocol))throw new AppError(503,'JUDGE0_URL must use HTTP or HTTPS.','RUNNER_UNAVAILABLE');url.search='';url.hash='';url.pathname=url.pathname.replace(/\/+$/,'').replace(/\/submissions$/,'');return url.toString().replace(/\/$/,'')}
-function encodeJudgeText(value){return Buffer.from(String(value??''),'utf8').toString('base64')}
-function decodeJudgeText(value){if(typeof value!=='string'||!value)return value||'';return Buffer.from(value,'base64').toString('utf8')}
-function decodeJudgeResult(result){for(const field of ['stdout','stderr','compile_output','message'])if(typeof result[field]==='string')result[field]=decodeJudgeText(result[field]);return result}
-function normalizeJudge0(result,base64Encoded=false){
- if(base64Encoded)result=decodeJudgeResult(result);
+function normalizeJudge0(result){
  const status=result.status?.description||'Unknown';
  if(!Number.isInteger(result.status?.id)||result.status.id<3)throw new AppError(502,`Judge returned an incomplete result (${status}).`,'RUNNER_ERROR');
  const stderr=[result.compile_output,result.stderr,result.message].filter(Boolean).join('\n').trim();
@@ -29,10 +25,10 @@ async function judge0Execute({language,sourceCode,input,limits={},baseUrl,header
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),totalWaitMs);
  try{
   const base=judgeApiBase(baseUrl);
-  const response=await fetch(`${base}/submissions?base64_encoded=true&wait=false`,{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify({language_id:languageId,source_code:encodeJudgeText(sourceCode),stdin:encodeJudgeText(input),cpu_time_limit:cpuSeconds,cpu_extra_time:1,wall_time_limit:Math.min(cpuSeconds+3,20),memory_limit:memoryKb,stack_limit:Math.min(memoryKb,65536),max_processes_and_or_threads:20,enable_network:false}),signal:controller.signal});
+  const response=await fetch(`${base}/submissions?base64_encoded=false&wait=false`,{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify({language_id:languageId,source_code:sourceCode,stdin:input,cpu_time_limit:cpuSeconds,cpu_extra_time:1,wall_time_limit:Math.min(cpuSeconds+3,20),memory_limit:memoryKb,stack_limit:Math.min(memoryKb,65536),max_processes_and_or_threads:20,enable_network:false}),signal:controller.signal});
   if(!response.ok){const status=response.status;throw new AppError(status===429||status===503?503:502,`Judge service refused the submission (HTTP ${status}). Verify judge availability and credentials.`,'RUNNER_ERROR')}
   const created=await response.json();
-  if(Number.isInteger(created.status?.id)&&created.status.id>=3)return normalizeJudge0(created,true);
+  if(Number.isInteger(created.status?.id)&&created.status.id>=3)return normalizeJudge0(created);
   if(!created.token)throw new AppError(502,'Judge did not return a submission token.','RUNNER_ERROR');
   const pollEvery=bounded(process.env.JUDGE0_POLL_INTERVAL_MS,200,2000,400);
   const deadline=Date.now()+totalWaitMs-1000;
@@ -40,10 +36,10 @@ async function judge0Execute({language,sourceCode,input,limits={},baseUrl,header
   while(Date.now()<deadline){
    await sleep(Math.min(nextPollDelay,Math.max(50,deadline-Date.now())));
    try{
-    const polled=await fetch(`${base}/submissions/${encodeURIComponent(created.token)}?base64_encoded=true`,{headers,signal:controller.signal});
+    const polled=await fetch(`${base}/submissions/${encodeURIComponent(created.token)}?base64_encoded=false`,{headers,signal:controller.signal});
     if(!polled.ok){if(isTransientJudgeStatus(polled.status)){lastPollFailure=`HTTP ${polled.status}`;nextPollDelay=retryDelay(polled,Math.min(2000,nextPollDelay*2));continue}const errorBody=await polled.text().catch(()=> '');throw judgeLookupError(polled.status,errorBody)}
     const result=await polled.json();
-    if(Number.isInteger(result.status?.id)&&result.status.id>=3)return normalizeJudge0(result,true);
+    if(Number.isInteger(result.status?.id)&&result.status.id>=3)return normalizeJudge0(result);
     if(!Number.isInteger(result.status?.id))throw new AppError(502,'Judge returned an invalid result status. Check the configured Judge0 endpoint.','RUNNER_ERROR');
     nextPollDelay=pollEvery;
    }catch(error){if(error.name==='AbortError')throw error;if(error instanceof AppError)throw error;lastPollFailure='a temporary network error';nextPollDelay=Math.min(2000,nextPollDelay*2)}
