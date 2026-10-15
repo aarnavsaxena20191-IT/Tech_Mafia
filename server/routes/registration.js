@@ -12,9 +12,12 @@ const router = express.Router();
 const teamRegistrationLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
 const teamJoinEmailLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 8,
+  limit: Number(process.env.TEAM_JOIN_EMAIL_LIMIT || 50),
   skipSuccessfulRequests: true,
-  keyGenerator: (req) => crypto.createHash('sha256').update(String(req.body?.email || '').trim().toLowerCase()).digest('hex'),
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    return email ? crypto.createHash('sha256').update(email).digest('hex') : (req.ip || 'unknown');
+  },
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });
